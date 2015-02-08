@@ -42,7 +42,9 @@ A hardware Arduino-based device
 
 ### Workflow
 Thread 1: receives sensors data from radio module, decodes it, and stores into memory using cycling overwrite mode.
+
 Thread 2: opens TCP socket and waits for connections. Creates new thread for each incoming connection.
+
 Thread 3...N: receives http request for data from sensors, prepares answer using recently collected data from memory, and sends http response back to the socket.
 
 ## Data collector script
