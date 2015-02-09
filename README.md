@@ -183,7 +183,7 @@ Mobile/browser application
 8. Predict weather
 
 # Communications
-![Comm diagram](https://raw.githubusercontent.com/ValeriyKopylov/Weather-Monitor/master/CommDiagram.png)
+![Comm diagram](https://raw.githubusercontent.com/ValeriyKopylov/Weather-Monitor/master/Diagrams/CommDiagram.png)
 
 # Key principles
 1. Module system – each component is as independent as possible, we also should have certain and transparent descriptions of communications protocols between modules.
