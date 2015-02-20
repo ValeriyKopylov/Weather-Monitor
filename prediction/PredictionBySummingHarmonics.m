@@ -51,7 +51,7 @@ for i = 1:L/2
         break
     end
     
-    y_restored = y_restored + exp(2 * pi * 1i * freqs(i) * tp / L);
+    y_restored = y_restored + exp(2 * pi * 1i * freqs(i) * signs(i) * tp / L);
 end
 
 subplot(6,1,5);  
