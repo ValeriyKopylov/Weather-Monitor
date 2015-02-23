@@ -1,8 +1,25 @@
+#!/usr/bin/env python
+
 import sys
 import getopt
 import mysql.connector
 import socket
 import json
+
+
+def print_usage():
+    print """\
+Data collector arguments:
+./collector.py
+    [-u|--user] <DB login>
+    [-p|--p] <DB password>
+    [-i|--ip] <DB ip address>
+    [-n|--name] <DB schema name>
+    [-c|--carrier_id] <carrier id in DB>
+
+Example:
+./collector.py --user data-collector --password 1 --host_ip 127.0.0.1 --db_name weather_monitor --carrier_id 1
+"""
 
 
 def parse_command_line(arguments):
@@ -16,11 +33,11 @@ def parse_command_line(arguments):
                                    'hu:p:i:n:c:',
                                    ['help', 'user=', 'password=', 'host_ip=', 'db_name=', 'carrier_id='])
     except getopt.GetoptError:
-        print 'really bad arguments'
+        print_usage()
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print 'usage message'
+            print_usage()
             sys.exit()
         elif opt in ('-u', '--user'):       user = arg
         elif opt in ('-p', '--password'):   password = arg
@@ -56,6 +73,9 @@ def main(arguments):
 
     # Parse response
     result = json.loads(response)
+    for outpost_data in result:
+        print outpost_data
+        # cursor.execute('INSERT INTO ip, port FROM carrier WHERE carrier_id = %s', carrier_id)
 
     # Close DB connection
     db_connection.close()
