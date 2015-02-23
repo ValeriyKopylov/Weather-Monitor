@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import sys
 import getopt
 import SocketServer
@@ -14,90 +16,75 @@ class MyTCPServerHandler(SocketServer.BaseRequestHandler):
         try:
             data = json.loads(self.request.recv(1024).strip())
             # process the data, i.e. print it:
-            print data
+            print ''
+            print 'Incoming request from %s:%s' % self.client_address
+            print 'Request:  ' + str(data)
             # send some 'ok' back
             response = json.dumps(
                 [
-                    [
-                        {'outpost_id': 1},
-                        {'time': time.time()},
-                        [
-                            {'sensor': 1},
-                            {'value': 41}
-                        ],
-                        [
-                            {'sensor': 2},
-                            {'value': 42}
-                        ],
-                        [
-                            {'sensor': 3},
-                            {'value': 43}
-                        ],
-                        [
-                            {'sensor': 4},
-                            {'value': 44}
-                        ],
-                        [
-                            {'sensor': 5},
-                            {'value': 45}
-                        ],
-                    ],
-                    [
-                        {'outpost_id': 2},
-                        {'time': time.time()},
-                        [
-                            {'sensor': 1},
-                            {'value': 241}
-                        ],
-                        [
-                            {'sensor': 2},
-                            {'value': 242}
-                        ],
-                        [
-                            {'sensor': 3},
-                            {'value': 243}
-                        ],
-                        [
-                            {'sensor': 4},
-                            {'value': 244}
-                        ],
-                        [
-                            {'sensor': 5},
-                            {'value': 245}
-                        ]
-                    ]
+                    {
+                        'outpost_id': 1,
+                        'time': time.time(),
+                        'T': 41,
+                        'P': 42,
+                        'H': 43,
+                        'L': 44,
+                        'G': 45
+                    },
+                    {
+                        'outpost_id': 2,
+                        'time': time.time(),
+                        'T': 141,
+                        'P': 142,
+                        'H': 143,
+                        'L': 144,
+                        'G': 145
+                    },
                 ]
             )
-            print(response)
+            print 'Response: ' + str(response)
             self.request.sendall(response)
         except Exception, e:
             print "Exception wile receiving message: ", e
 
 
+def print_usage():
+    print """\
+Carrier Emulator arguments:
+./carrier_emulator.py [-i|--ip] <ip address> [-p|--port] <port>
+
+Example:
+./carrier_emulator.py --ip 127.0.0.1 --port 4242
+"""
+
+
 def parse_command_line(arguments):
     ip = ''
     port = 0
-    carrier_id = 0
     try:
         opts, args = getopt.getopt(arguments,
-                                   'hi:p:c:',
-                                   ['help', 'ip=', 'port=', 'carrier_id='])
+                                   'hi:p:',
+                                   ['help', 'ip=', 'port='])
     except getopt.GetoptError:
-        print 'really bad arguments'
+        print_usage()
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print 'usage message'
+            print_usage()
             sys.exit()
-        elif opt in ('-i', '--ip'):         ip = arg
-        elif opt in ('-p', '--port'):       port = arg
-        elif opt in ('-c', '--carrier_id'): carrier_id = arg
+        elif opt in ('-i', '--ip'):   ip = arg
+        elif opt in ('-p', '--port'): port = arg
 
-    return ip, port, carrier_id
+    if ip == '' or port == 0:
+        print_usage()
+        sys.exit()
+
+    return ip, port
 
 
 def main(arguments):
-    ip, port, carrier_id = parse_command_line(arguments)
+    ip, port = parse_command_line(arguments)
+    print 'Start server at %s:%s' % (ip, port)
 
     server = MyTCPServer((ip, int(port)), MyTCPServerHandler)
     server.serve_forever()
