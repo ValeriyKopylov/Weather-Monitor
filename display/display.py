@@ -60,7 +60,7 @@ def parse_command_line(arguments):
 def plot(fig, xlabel, ylabel, x, y, inc):
     if inc == 1:
         plot.subplot_cntr += 1
-    sp = fig.add_subplot(1, 1, plot.subplot_cntr)
+    sp = fig.add_subplot(2, 1, plot.subplot_cntr)
     sp.plot(x, y)
     sp.set_xlabel(xlabel)
     sp.set_ylabel(ylabel)
@@ -71,6 +71,11 @@ def main(arguments):
 
     t = []
     y = []
+    total_count = 0
+
+    t_grouped = []
+    y_grouped = []
+    intervals_count = 1000
 
     # Connect to DB
     db_connection = mysql.connector.connect(user=user, password=password, host=host_ip, database=db_name)
@@ -86,21 +91,24 @@ def main(arguments):
             (change_time BETWEEN %s AND %s)
         ORDER BY change_time
         """, (sensor_id, date_from, date_to))
-    first_point = True
-    intervals_count = 1000
     interval_length = (datetime.datetime.strptime(date_to, '%Y-%m-%d') - datetime.datetime.strptime(date_from, '%Y-%m-%d')) / intervals_count
     interval_start = 0
     accumulated_y = 0.0
     accumulated_count = 0
+    first_point = True
     for point in cursor.fetchall():
+        total_count += 1
         curr_t, curr_y = point
+        t.append(curr_t)
+        y.append(curr_y)
         if first_point:
             first_point = False
             interval_start = curr_t
         if curr_t - interval_start > interval_length:
             if accumulated_count > 0:
-                t.append(time.mktime(interval_start.timetuple()))
-                y.append(accumulated_y / accumulated_count)
+                # t_grouped.append(time.mktime(interval_start.timetuple()))
+                t_grouped.append(interval_start)
+                y_grouped.append(accumulated_y / accumulated_count)
             interval_start += interval_length
             accumulated_y = 0.0
             accumulated_count = 0
@@ -108,14 +116,15 @@ def main(arguments):
             accumulated_y += curr_y
             accumulated_count += 1
     if accumulated_count > 0:
-        t.append(time.mktime(interval_start.timetuple()))
-        y.append(accumulated_y / accumulated_count)
+        t_grouped.append(interval_start)
+        y_grouped.append(accumulated_y / accumulated_count)
 
 
     plot.subplot_cntr = 0
     plt.close('all')
     fig1 = plt.figure()
-    plot(fig1, 'time (s)', 'signal', t, y, 1)
+    plot(fig1, 'original time', 'signal', t, y, 1)
+    plot(fig1, 'grouped time', 'signal', t_grouped, y_grouped, 1)
     plt.show()
 
 
