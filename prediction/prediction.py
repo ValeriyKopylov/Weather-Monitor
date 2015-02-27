@@ -1,64 +1,69 @@
-#TODO add noise: pink, blue, white.
-#TODO fuck the thresholds. Apply low pass filter.
-
-import numpy as np
 import matplotlib.pyplot as plt
-
-def plot(fig, xlabel, ylabel, x, y, inc):
-	if (inc == 1):
-		plot.subplot_cntr += 1;
-	sp = fig.add_subplot(5, 1, plot.subplot_cntr);
-	sp.plot(x, y);
-	sp.set_xlabel(xlabel);
-	sp.set_ylabel(ylabel);
-plot.subplot_cntr = 0;
-
-def filter_spectrum(spectrum, Fs, threshold):
-	L = len(spectrum);
-	freqs = np.zeros(L / 2);
-	amps = np.ones(L / 2);
-	k = 0;
-	for i in range(0, L / 2):
-		if (abs(spectrum[i]) > threshold and i != 0):          #do not touch mean value
-			freqs[k] = Fs * i;                      
-			amps[k] = 2 * abs(spectrum[i]);
-			k = k + 1;
-	return freqs, amps;
-
-def restore(amps, freqs, T, t, predict_by):
-	tp = T * np.linspace(0, len(t) - 1 + predict_by, L + predict_by);
-	y_restored = np.zeros(len(tp));
-	for i in range(0, L / 2):
-		if freqs[i] == 0:
-			break
-		y_restored = np.add(y_restored, amps[i] * np.exp(1j * 2 * np.pi * freqs[i]* tp / L));
-	return tp, y_restored;
-
-def predict(data, T, Fs, t, predict_by):
-	threshold = 0.3;
-	Y = np.fft.fft(y) / L;
-	F = Fs / 2 * np.linspace(0, 1, L);
-	plot(fig1, 'Hz', 'RE(spectrum)', F, np.real(Y), 1);
-	plot(fig1, 'Hz', 'IM(spectrum)', F, np.imag(Y), 1);
-	freqs, amps = filter_spectrum(Y, Fs, threshold);
-	return restore(amps, freqs, T, t, predict_by);
+from spectrum import *
+import numpy as np
+from scipy import signal
 
 plt.close('all')
-fig1 = plt.figure();
-L = 1000;
-Fs = np.float128(1 / 15.0); #once per 15 secs	
-T = np.float128(1 / Fs);				
-t = T * np.linspace(0, L - 1, L);
-predict_by = Fs * T;	#predict one next value
 
-y = np.sin(2 * np.pi * 37 * t / L) + np.cos(2 * np.pi * 20 * t / L) + np.cos(2 * np.pi * 120 * t / L) + np.cos(2 * np.pi * 111 * t / L);
-plot(fig1, 'time(s)', 'signal', t, y, 1);
+# point where to start prediction
+M = 30000
+# number of samples in extrapolated time series1
+P = 50000
+# order of regression model
+N = (P - M) / 10
+# all plots will be there
+fig1 = plt.figure()
+# discretization frequency
+Fs = np.float128(1 / 15.0)
+# discretization period
+T = np.float128(1 / Fs)
+# time axis of input + predicted samples
+tp = T * np.linspace(0, P - 1, P)
+# input signal
+secs_in_day = 86400
+secs_in_month = 86400 * 30
+secs_in_year = secs_in_month * 12
 
-tp, y_restored = predict(y, T, Fs, t, predict_by);
+# signal at 1/15/86400 HZ
+# + signal at 1/15/86400/30 HZ
+# + signal at 1/15/86400/30/12 HZ
+# So cutoff can be 1/15/86400 will be ok
+# Cut off frequency for firwin filter
+FC = Fs / secs_in_day #Hz
 
-plot(fig1, 'time(s)', 'RE(restored)', tp, np.real(y_restored), 1);
-plot(fig1, 'time(s)', 'RE(restored)', t, np.real(y), 0);
-plot(fig1, 'time(s)', 'IM(restored)', tp, np.imag(y_restored), 1);
-plot(fig1, 'time(s)', 'IM(restored)', t, np.imag(y), 0);
+# signal itself
+x = np.sin(2*np.pi*tp/secs_in_day)\
+    + np.sin(2*np.pi*tp/secs_in_month)\
+    + np.sin(2*np.pi*tp/secs_in_year)
 
-plt.show();
+# generate additive noise
+noise = 0.03 * np.random.randn(1, P)
+x = x + noise[0]
+# plot noised guy
+plt.plot(tp[0:P], x)
+fig2 = plt.figure()
+# design filter using z-transform. we need firwin lowpass filter
+filter_denominator = 1
+filter_numerator = signal.firwin(N, cutoff=FC, window='hamming')
+# apply filter
+x = signal.lfilter(filter_numerator, filter_denominator,  x)
+# compute regression coefficients.
+# TODO handle rho less than 0 exception. Try to predict by smaller interval in the future
+[A, E, K] = arburg(x, N)
+# allocate memory for output
+y = np.zeros(P)
+# fill part of the output with known part
+y[0:M] = x[0:M]
+
+# apply regression model to the signal.
+# actually this is IIR filter.
+# use lfilter func in future.
+for i in range(M, P):
+    y[i] = -1 * np.sum(A * y[i-1:i-1-N:-1])
+
+# plot results
+plt.plot(tp, x, tp, y)
+# draw current moment
+plt.axvline(M * T, -10, 10, linewidth=4, color='r')
+# show everything
+plt.show()
