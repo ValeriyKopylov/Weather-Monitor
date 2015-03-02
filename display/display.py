@@ -64,7 +64,7 @@ def parse_command_line(arguments):
 def plot(fig, xlabel, ylabel, x, y, inc):
     if inc == 1:
         plot.subplot_cntr += 1
-    sp = fig.add_subplot(2, 1, plot.subplot_cntr)
+    sp = fig.add_subplot(3, 1, plot.subplot_cntr)
     sp.plot(x, y)
     sp.set_xlabel(xlabel)
     sp.set_ylabel(ylabel)
@@ -75,11 +75,13 @@ def main(arguments):
 
     t = []
     y = []
-    total_count = 0
 
     t_grouped = []
     y_grouped = []
     intervals_count = 1000
+
+    t_grouped_on_server = []
+    y_grouped_on_server = []
     
     start_time = time.time()
     timestamps = []
@@ -88,7 +90,7 @@ def main(arguments):
     db_connection = mysql.connector.connect(user=user, password=password, host=host_ip, database=db_name)
     cursor = db_connection.cursor()
     
-    timestamps.append(("1. Connect to db", time.time()))
+    timestamps.append(("Connect to db", time.time()))
 
     # Get measurements from DB
     cursor.execute("""
@@ -101,21 +103,19 @@ def main(arguments):
         ORDER BY change_time
         """, (sensor_id, date_from, date_to))
 
-    timestamps.append(("2. Execute cursor", time.time()))
+    timestamps.append(("[group by Python] Execute SELECT", time.time()))
 
     fetched = cursor.fetchall()
 
+    timestamps.append(("[group by Python] Fetch full data", time.time()))
+
+    # Group fetched data
     interval_length = (datetime.datetime.strptime(date_to, '%Y-%m-%d') - datetime.datetime.strptime(date_from, '%Y-%m-%d')) / intervals_count
     interval_start = 0
     accumulated_y = 0.0
     accumulated_count = 0
     first_point = True
-    
-    timestamps.append(("3. Fetch data", time.time()))
-    
-    for point in fetched:
-        total_count += 1
-        curr_t, curr_y = point
+    for curr_t, curr_y in fetched:
         t.append(curr_t)
         y.append(curr_y)
         if first_point:
@@ -129,28 +129,43 @@ def main(arguments):
             interval_start += interval_length
             accumulated_y = 0.0
             accumulated_count = 0
-        else:
-            accumulated_y += curr_y
-            accumulated_count += 1
+        accumulated_y += curr_y
+        accumulated_count += 1
     if accumulated_count > 0:
         t_grouped.append(interval_start)
         y_grouped.append(accumulated_y / accumulated_count)
 
-    timestamps.append(("4. Group points", time.time()))
+    timestamps.append(("[group by Python] Group and store points", time.time()))
+
+    cursor.callproc("get_measurements", [sensor_id, date_from, date_to, intervals_count])
+
+    timestamps.append(("[group by DB] Execute get_measurements()", time.time()))
+
+    for result in cursor.stored_results():
+        fetched = result.fetchall()
+
+    timestamps.append(("[group by DB] Fetch grouped data", time.time()))
+
+    for curr_t, curr_y in fetched:
+        t_grouped_on_server.append(curr_t)
+        y_grouped_on_server.append(curr_y)
+
+    timestamps.append(("[group by DB] Store grouped points", time.time()))
 
     plot.subplot_cntr = 0
     plt.close('all')
     fig1 = plt.figure()
     plot(fig1, 'original time', 'signal', t, y, 1)
     plot(fig1, 'grouped time', 'signal', t_grouped, y_grouped, 1)
+    plot(fig1, 'server grouped time', 'signal', t_grouped_on_server, y_grouped_on_server, 1)
 
-    timestamps.append(("5. Build plot", time.time()))
+    timestamps.append(("Build plot", time.time()))
+
+    for timestamp_name, timestamp_value in timestamps:
+        print "%s: %f" % (timestamp_name, timestamp_value - start_time)
+        start_time = timestamp_value
 
     plt.show()
-    
-    for timestamp_name, timestamp_value in timestamps:
-		print "%s: %f" % (timestamp_name, timestamp_value - start_time)
-		start_time = timestamp_value
-        
+
 if __name__ == '__main__':
     main(sys.argv[1:])
