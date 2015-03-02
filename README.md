@@ -1,33 +1,3 @@
-# Schedule
-
-Task | Assigned to | Deadline | Status
----- | ----------- | -------- | ------
-Register on github | Vladimir | 02/10 | 
-Establish radio connection between carrier and outpost | Vladimir | 02/10 | 
-Prepare carrier-outpost comm protocol | @EvgenyAgafonchikov | | 
-Make outpost prototype with some sensors | @EvgenyAgafonchikov | | 
-Implement comm protocol on outpost | @EvgenyAgafonchikov | | 
-Implement comm protocol on carrier | @EvgenyAgafonchikov | | 
-Implement data storing on carrier | @EvgenyAgafonchikov | | 
-Implement web server on carrier | @EvgenyAgafonchikov+@RomanGromov | | 
-Implement data sending through http on carrier | @EvgenyAgafonchikov+@RomanGromov | | 
-Create VM for server | @ValeriyKopylov | | *Done*
-Create DB with sample data | @ValeriyKopylov | 02/10 | 
-Deploy VM to work PC | @ValeriyKopylov | 02/11 | 
-Prepare script-carrier comm protocol | @ValeriyKopylov | 02/13 | 
-Implement data collector script | @ValeriyKopylov | 02/15 | 
-Implement carrier emulator for test purposes | @ValeriyKopylov | 02/15 | 
-Deploy script to VM, add to cron | @ValeriyKopylov | 02/16 | 
-Install Node.js on VM | @RomanGromov | | 
-Make web service | @RomanGromov | | 
-Make client application | @RomanGromov | | 
-Prepare math module command line interface | @ValeriyKopylov+Vladimir | 02/13 | 
-Implement math module barebone: read argv, connect to DB, read & write dummy values | Vladimir | | 
-Prepare first math module model | Vladimir | | 
-Add tables & fields for math module to DB | Vladimir+@ValeriyKopylov | | 
-Implement math module model | Vladimir | | 
-Deploy math module to VM, add to cron | Vladimir+@ValeriyKopylov | | 
-
 # Components and their functions
 
 ## Sensor box (outpost)
