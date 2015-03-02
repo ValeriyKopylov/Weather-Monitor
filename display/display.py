@@ -22,7 +22,7 @@ Application arguments:
     [-t|--date_to] <end date for graph>
 
 Example:
-./display.py --user data-collector --password 1 --host_ip 127.0.0.1 --db_name weather_monitor --sensor_id 1 --date_from 2015-01-15 --date_to 2015-02-01
+./display.py --user data-collector --password 1 --host_ip 127.0.0.1 --db_name weather_monitor --sensor_id 1 --date_from 2015-01-01 --date_to 2015-02-01
 """
 
 
@@ -54,6 +54,10 @@ def parse_command_line(arguments):
         elif opt in ('-f', '--date_from'): date_from = arg
         elif opt in ('-t', '--date_to'):   date_to = arg
 
+    if user == '' or password == '' or host_ip == '' or db_name == '' or sensor_id == 0 or date_from == 0 or date_to == 0:
+        print_usage()
+        sys.exit()
+
     return user, password, host_ip, db_name, sensor_id, date_from, date_to
 
 
@@ -76,10 +80,15 @@ def main(arguments):
     t_grouped = []
     y_grouped = []
     intervals_count = 1000
+    
+    start_time = time.time()
+    timestamps = []
 
     # Connect to DB
     db_connection = mysql.connector.connect(user=user, password=password, host=host_ip, database=db_name)
     cursor = db_connection.cursor()
+    
+    timestamps.append(("1. Connect to db", time.time()))
 
     # Get measurements from DB
     cursor.execute("""
@@ -91,12 +100,20 @@ def main(arguments):
             (change_time BETWEEN %s AND %s)
         ORDER BY change_time
         """, (sensor_id, date_from, date_to))
+
+    timestamps.append(("2. Execute cursor", time.time()))
+
+    fetched = cursor.fetchall()
+
     interval_length = (datetime.datetime.strptime(date_to, '%Y-%m-%d') - datetime.datetime.strptime(date_from, '%Y-%m-%d')) / intervals_count
     interval_start = 0
     accumulated_y = 0.0
     accumulated_count = 0
     first_point = True
-    for point in cursor.fetchall():
+    
+    timestamps.append(("3. Fetch data", time.time()))
+    
+    for point in fetched:
         total_count += 1
         curr_t, curr_y = point
         t.append(curr_t)
@@ -119,14 +136,21 @@ def main(arguments):
         t_grouped.append(interval_start)
         y_grouped.append(accumulated_y / accumulated_count)
 
+    timestamps.append(("4. Group points", time.time()))
 
     plot.subplot_cntr = 0
     plt.close('all')
     fig1 = plt.figure()
     plot(fig1, 'original time', 'signal', t, y, 1)
     plot(fig1, 'grouped time', 'signal', t_grouped, y_grouped, 1)
+
+    timestamps.append(("5. Build plot", time.time()))
+
     plt.show()
-
-
+    
+    for timestamp_name, timestamp_value in timestamps:
+		print "%s: %f" % (timestamp_name, timestamp_value - start_time)
+		start_time = timestamp_value
+        
 if __name__ == '__main__':
     main(sys.argv[1:])
