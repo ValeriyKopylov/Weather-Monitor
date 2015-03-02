@@ -5,6 +5,7 @@ import getopt
 import mysql.connector
 import socket
 import json
+import time
 
 
 def print_usage():
@@ -64,8 +65,8 @@ def main(arguments):
     socket_connection.connect((carrier_ip, carrier_port))
 
     # Send request to carrier
-    request = {'command': 'GetData'}
-    socket_connection.send(json.dumps(request))
+    request = {"command": "GetData", "time": int(time.time())}
+    socket_connection.send(json.dumps(request, encoding='ascii'))
 
     # Receive response from carrier and immediately close socket
     response = socket_connection.recv(1024)

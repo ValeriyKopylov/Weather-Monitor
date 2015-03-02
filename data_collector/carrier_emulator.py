@@ -14,17 +14,18 @@ class MyTCPServer(SocketServer.ThreadingTCPServer):
 class MyTCPServerHandler(SocketServer.BaseRequestHandler):
     def handle(self):
         try:
-            data = json.loads(self.request.recv(1024).strip())
+            request = self.request.recv(1024).strip()
+            data = json.loads(request)
             # process the data, i.e. print it:
             print ''
             print 'Incoming request from %s:%s' % self.client_address
-            print 'Request:  ' + str(data)
+            print 'Request:  ' + request
             # send some 'ok' back
             response = json.dumps(
                 [
                     {
                         'outpost_id': 1,
-                        'time': time.time(),
+                        'time': int(time.time()),
                         'T': 41,
                         'P': 42,
                         'H': 43,
@@ -33,7 +34,25 @@ class MyTCPServerHandler(SocketServer.BaseRequestHandler):
                     },
                     {
                         'outpost_id': 2,
-                        'time': time.time(),
+                        'time': int(time.time()),
+                        'T': 141,
+                        'P': 142,
+                        'H': 143,
+                        'L': 144,
+                        'G': 145
+                    },
+                    {
+                        'outpost_id': 1,
+                        'time': int(time.time()) - 15,
+                        'T': 41,
+                        'P': 42,
+                        'H': 43,
+                        'L': 44,
+                        'G': 45
+                    },
+                    {
+                        'outpost_id': 2,
+                        'time': int(time.time()) - 15,
                         'T': 141,
                         'P': 142,
                         'H': 143,
