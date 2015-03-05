@@ -8,7 +8,7 @@ const uint64_t pipes[2] = { 0xe7e7e7e7e7LL, 0xc2c2c2c2c2LL };
 
 static const uint16_t OutpostId = 0x01;
 static const uint16_t SensorNumber = 0x06;
-static const uint16_t PacketSize = 0x0D;
+static const uint16_t PacketSize = 0x12;
 static const byte TempSensorId = 0x01;
 static const byte GasSensorId = 0x02;
 static const byte HumSensorId = 0x03;
@@ -32,10 +32,10 @@ void setup() {
 
 void loop() {
   if (radio.available()) {
-    byte rx_data[sizeof(uint16_t) + 3 * sizeof(float)];
+    byte rx_data[PacketSize];
     bool done = false;
     while (!done) {
-      done = radio.read(&rx_data, sizeof(uint16_t) + 3 * sizeof(float));
+      done = radio.read(&rx_data, PacketSize);
     }
     Serial.write(rx_data, PacketSize);
   }
