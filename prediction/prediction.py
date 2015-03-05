@@ -73,17 +73,17 @@ def predict(x, P, Fs, Fc):
     tp = T * np.linspace(0, L - 1, L)
 
     # order of regression model
-    N = P / 10
+    N = P
 
     # limit regression order
-    if (N < 50):
-        N = 50
-    if (N > 400):
-        N = 400
+    if (N < 200):
+        N = 200
+    if (N > 1000):
+        N = 1000
 
     # design filter using z-transform. we need firwin lowpass filter
     A = 1
-    B = signal.firwin(50, cutoff=Fc, window='hamming')
+    B = signal.firwin(101, cutoff=Fc, window='hamming')
 
     # apply filter
     x = signal.lfilter(B, A, x)
@@ -145,8 +145,9 @@ def main(arguments):
 
     # point where to start prediction
     M = len(y)
-    # number of samples in extrapolated time series1
-    P = len(y) + 100000
+    samples_per_day = 5760
+    # number of samples in extrapolated time series
+    P = len(y) + samples_per_day
 
     # discretization frequency
     Fs = np.float128(1 / 15.0)
@@ -165,7 +166,7 @@ def main(arguments):
     # + signal at 1/15/86400/30/12 HZ
     # So cutoff can be 1/15/86400 will be ok
     # Cut off frequency for firwin filter
-    FC = Fs / secs_in_day #Hz
+    FC = Fs / secs_in_day * 10 #Hz
 
     # plot noised guy
     plt.plot(ti, y)
