@@ -1,7 +1,65 @@
+import sys
+import getopt
+import mysql.connector
+import datetime
+import time
+
 import matplotlib.pyplot as plt
 from spectrum import *
 import numpy as np
 from scipy import signal
+
+
+def print_usage():
+    print """\
+Application arguments:
+./display.py
+    [-u|--user] <DB login>
+    [-p|--p] <DB password>
+    [-i|--ip] <DB ip address>
+    [-n|--name] <DB schema name>
+    [-s|--sensor_id] <sensor id in DB>
+    [-f|--date_from] <start date for graph>
+    [-t|--date_to] <end date for graph>
+
+Example:
+./display.py --user data-collector --password 1 --host_ip 127.0.0.1 --db_name weather_monitor --sensor_id 1 --date_from 2015-01-01 --date_to 2015-02-01
+"""
+
+
+def parse_command_line(arguments):
+    user = ''
+    password = ''
+    host_ip = ''
+    db_name = ''
+    sensor_id = 0
+    date_from = 0
+    date_to = 0
+    try:
+        opts, args = getopt.getopt(
+            arguments,
+            'hu:p:i:n:s:f:t:',
+            ['help', 'user=', 'password=', 'host_ip=', 'db_name=', 'sensor_id=', 'date_from=', 'date_to='])
+    except getopt.GetoptError:
+        print_usage()
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print_usage()
+            sys.exit()
+        elif opt in ('-u', '--user'):      user = arg
+        elif opt in ('-p', '--password'):  password = arg
+        elif opt in ('-i', '--host_ip'):   host_ip = arg
+        elif opt in ('-n', '--db_name'):   db_name = arg
+        elif opt in ('-s', '--sensor_id'): sensor_id = arg
+        elif opt in ('-f', '--date_from'): date_from = arg
+        elif opt in ('-t', '--date_to'):   date_to = arg
+
+    if user == '' or password == '' or host_ip == '' or db_name == '' or sensor_id == 0 or date_from == 0 or date_to == 0:
+        print_usage()
+        sys.exit()
+
+    return user, password, host_ip, db_name, sensor_id, date_from, date_to
 
 
 def predict(x, P, Fs, Fc):
@@ -48,62 +106,82 @@ def predict(x, P, Fs, Fc):
         
     return tp, y
 
-plt.close('all')
 
-# all plots will be there
-fig1 = plt.figure()
+def main(arguments):
+    user, password, host_ip, db_name, sensor_id, date_from, date_to = parse_command_line(arguments)
 
-# point where to start prediction
-M = 3000
-# number of samples in extrapolated time series1
-P = 5000
+    t = []
+    y = []
 
-# discretization frequency
-Fs = np.float128(1 / 15.0)
+    start_time = time.time()
+    timestamps = []
 
-# discretization period
-T = np.float128(1 / Fs)
+    # Connect to DB
+    db_connection = mysql.connector.connect(user=user, password=password, host=host_ip, database=db_name)
+    cursor = db_connection.cursor()
 
-# time axis of input + predicted samples
-ti = T * np.linspace(0, M - 1, M)
+    # Get measurements from DB
+    cursor.execute("""
+        SELECT change_time, result
+        FROM measurement
+        WHERE
+            (sensor_id = %s)
+            AND
+            (change_time BETWEEN %s AND %s)
+        ORDER BY change_time
+        """, (sensor_id, date_from, date_to))
 
-# input signal
-secs_in_day = 86400
-secs_in_month = 86400 * 30
-secs_in_year = secs_in_month * 12
+    fetched = cursor.fetchall()
 
-# signal at 1/15/86400 HZ
-# + signal at 1/15/86400/30 HZ
-# + signal at 1/15/86400/30/12 HZ
-# So cutoff can be 1/15/86400 will be ok
-# Cut off frequency for firwin filter
-FC = Fs / secs_in_day #Hz
+    # Group fetched data
+    for curr_t, curr_y in fetched:
+        t.append(curr_t)
+        y.append(curr_y)
 
-# signal itself
-x = np.sin(2*np.pi*ti/secs_in_day)\
-    + np.sin(2*np.pi*ti/secs_in_month)\
-    + np.sin(2*np.pi*ti/secs_in_year)
+    plt.close('all')
 
-# generate additive noise
-noise = 0.03 * np.random.randn(1, M)
-x = x + noise[0]
-# plot noised guy
-plt.plot(ti, x)
+    # all plots will be there
+    fig1 = plt.figure()
 
-# create figure for results
-fig2 = plt.figure()
-# do the job
-tp, y = predict(x, P - M, Fs, FC)
+    # point where to start prediction
+    M = len(y)
+    # number of samples in extrapolated time series1
+    P = len(y) + 100000
 
-# compare with continued signal
-# TODO remove this during integration with db
-x = np.sin(2*np.pi*tp/secs_in_day)\
-    + np.sin(2*np.pi*tp/secs_in_month)\
-    + np.sin(2*np.pi*tp/secs_in_year)
+    # discretization frequency
+    Fs = np.float128(1 / 15.0)
 
-# plot results
-plt.plot(tp, x, tp, y)
-# draw current moment
-plt.axvline(M * T, -10, 10, linewidth=4, color='r')
-# show everything
-plt.show()
+    # discretization period
+    T = np.float128(1 / Fs)
+
+    # time axis of input + predicted samples
+    ti = T * np.linspace(0, M - 1, M)
+
+    # input signal
+    secs_in_day = 86400
+
+    # signal at 1/15/86400 HZ
+    # + signal at 1/15/86400/30 HZ
+    # + signal at 1/15/86400/30/12 HZ
+    # So cutoff can be 1/15/86400 will be ok
+    # Cut off frequency for firwin filter
+    FC = Fs / secs_in_day #Hz
+
+    # plot noised guy
+    plt.plot(ti, y)
+
+    # create figure for results
+    fig2 = plt.figure()
+    # do the job
+    tp, yp = predict(y, P - M, Fs, FC)
+
+    # plot results
+    plt.plot(ti, y, tp, yp)
+    # draw current moment
+    plt.axvline(M * T, -10, 10, linewidth=4, color='r')
+    # show everything
+    plt.show()
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
