@@ -1,14 +1,11 @@
 import sys
 import getopt
 import mysql.connector
-import datetime
-import time
 
 import matplotlib.pyplot as plt
 from spectrum import *
 import numpy as np
 from scipy import signal
-
 
 def print_usage():
     print """\
@@ -62,8 +59,8 @@ def parse_command_line(arguments):
     return user, password, host_ip, db_name, sensor_id, date_from, date_to
 
 
-def predict(x, P, Fs, Fc):
-    #discretization period
+def predict(x, P, Fs):
+    # discretization period
     T = np.float128(1 / Fs)
 
     # total length of output signal
@@ -71,26 +68,26 @@ def predict(x, P, Fs, Fc):
 
     # time axis of input + predicted samples
     tp = T * np.linspace(0, L - 1, L)
-
     # order of regression model
     N = P
 
-    # limit regression order
-    if (N < 200):
-        N = 200
-    if (N > 1000):
-        N = 1000
-
-    # design filter using z-transform. we need firwin lowpass filter
-    A = 1
-    B = signal.firwin(101, cutoff=Fc, window='hamming')
-
-    # apply filter
-    x = signal.lfilter(B, A, x)
-
+    # convolve with leaky integrator and apply median filter
+    M = 10
+    lbd = float(M-1) / float(M)
+    h = (1 - lbd) * pow(lbd, np.arange(100))
+    x = np.convolve(x, h, 'valid')
+    x = signal.medfilt(x, 15)
     # compute regression coefficients.
-    # TODO handle rho less than 0 exception. Try to predict by smaller interval in the future
-    [A, E, K] = arburg(x, N)
+    while(True):
+        global A
+        gotException = False
+        try:
+            [A, E, K] = arburg(x, N)
+        except ValueError:
+            gotException = True
+            N = N / 2
+        if gotException == False:
+            break
 
     # allocate memory for output
     y = np.zeros(L)
@@ -112,9 +109,6 @@ def main(arguments):
 
     t = []
     y = []
-
-    start_time = time.time()
-    timestamps = []
 
     # Connect to DB
     db_connection = mysql.connector.connect(user=user, password=password, host=host_ip, database=db_name)
@@ -145,9 +139,9 @@ def main(arguments):
 
     # point where to start prediction
     M = len(y)
-    samples_per_day = 5760
+    samples_per_half_a_day = 5760 / 2
     # number of samples in extrapolated time series
-    P = len(y) + samples_per_day
+    P = len(y) + samples_per_half_a_day
 
     # discretization frequency
     Fs = np.float128(1 / 15.0)
@@ -159,22 +153,22 @@ def main(arguments):
     ti = T * np.linspace(0, M - 1, M)
 
     # input signal
-    secs_in_day = 86400
+    # secs_in_day = 86400
 
-    # signal at 1/15/86400 HZ
-    # + signal at 1/15/86400/30 HZ
-    # + signal at 1/15/86400/30/12 HZ
-    # So cutoff can be 1/15/86400 will be ok
-    # Cut off frequency for firwin filter
-    FC = Fs / secs_in_day * 10 #Hz
+    # uncomment this while debugging
+    sigma2 = 0.5 #power of the noise
+    noise = sigma2 * np.random.rand(M)
+    #noise = 2 * np.random.rand(1, M)[0]
+    #s = 10 * np.sin(2*np.pi*50*ti / M)
+    y = y + noise
 
     # plot noised guy
     plt.plot(ti, y)
+    # do the job
+    tp, yp = predict(y, P - M, Fs)
 
     # create figure for results
     fig2 = plt.figure()
-    # do the job
-    tp, yp = predict(y, P - M, Fs, FC)
 
     # plot results
     plt.plot(ti, y, tp, yp)
