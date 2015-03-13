@@ -32,14 +32,11 @@ void setup() {
 
 void loop() {
   if (radio.available()) {
-    Serial.println("inRadio");
     byte rx_data[sizeof(uint16_t) + 3 * sizeof(float)];
     bool done = false;
     while (!done) {
       done = radio.read(&rx_data, sizeof(uint16_t) + 3 * sizeof(float));
     }
-//    radio.stopListening();
-//    radio.startListening();
     Serial.write(rx_data, PacketSize);
   }
 }
