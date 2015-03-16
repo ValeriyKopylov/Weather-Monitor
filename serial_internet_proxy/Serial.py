@@ -22,7 +22,7 @@ StopSerialListener = False
 def listenSerialAndAccumulateData(arg, speed):
     serial_connection = serial.Serial(arg, speed)
     log('Serial connection opened')
-    PacketLen = 0xC
+    PacketLen = 0x12
     def findNumberOfDigits(number):
         if (number == 0):
             return 0
@@ -42,12 +42,17 @@ def listenSerialAndAccumulateData(arg, speed):
         tempF = sensorData[4] + (sensorData[5] << 8)
         coI = sensorData[6] + (sensorData[7] << 8)
         coF = sensorData[8] + (sensorData[9] << 8)
-        lux = sensorData[10] + (sensorData[11] << 8)
+        luxI = sensorData[10] + (sensorData[11] << 8)
+        luxF = sensorData[12] + (sensorData[13] << 8)
+        humI = sensorData[14] + (sensorData[15] << 8)
+        humF = sensorData[16] + (sensorData[17] << 8)
         
         temp = tempI + tempF / (math.pow(10, findNumberOfDigits(tempF)))
         co = coI + coF / (math.pow(10, findNumberOfDigits(coF)))
+        lux = luxI + luxF / (math.pow(10, findNumberOfDigits(luxF)))
+        hum = humI + humF / (math.pow(10, findNumberOfDigits(humF)))
         # TODO add time here
-        jsonString = '{0} {1} {2} {3}'.format(outId, temp, co, lux)
+        jsonString = '{0} {1} {2} {3} {4}'.format(outId, temp, co, lux, hum)
         print jsonString
         BigJsonPacket.append(jsonString)
 
