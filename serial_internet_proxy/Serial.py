@@ -13,12 +13,7 @@ from threading import Thread
 BigJsonPacket = []
 
 StopSerialListener = False
-# Packet structure
-# --------------------------------------------------------------------------------
-# | 16 bit outpost_id | 32 bit(float) temp | 32 bit(float) CO | 16 bit(uint) Lux |
-# --------------------------------------------------------------------------------
-# float sends as 16 bit integral and 16 bit fractional part
-# total length 16 + 32 + 32 + 16 = 96 bit = 12 bytes
+
 def listenSerialAndAccumulateData(arg, speed):
     serial_connection = serial.Serial(arg, speed)
     log('Serial connection opened')
@@ -51,10 +46,20 @@ def listenSerialAndAccumulateData(arg, speed):
         co = coI + coF / (math.pow(10, findNumberOfDigits(coF)))
         lux = luxI + luxF / (math.pow(10, findNumberOfDigits(luxF)))
         hum = humI + humF / (math.pow(10, findNumberOfDigits(humF)))
-        # TODO add time here
-        jsonString = '{0} {1} {2} {3} {4}'.format(outId, temp, co, lux, hum)
-        print jsonString
-        BigJsonPacket.append(jsonString)
+        
+        #jsonString = '{"outpost_id": %s, "G": %s, "H": %s, "L": %s, "T": %s, "time": %s}, ' % (outId, co, hum, lux, temp, int(time.time()))
+        #print jsonString
+        #BigJsonPacket.append(jsonString)
+        json_string = {
+        'outpost_id': outId,
+        'time': int(time.time()),
+        'T': temp,
+        'H': hum,
+        'L': lux,
+        'G': co,
+        }
+        print json_string
+        BigJsonPacket.append(json_string)
 
 def log(message):
     print '[%s] %s' % (time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()), message)
@@ -67,16 +72,19 @@ class MyTCPServer(SocketServer.ThreadingTCPServer):
 
 class MyTCPServerHandler(SocketServer.BaseRequestHandler):
     def handle(self):
+        global BigJsonPacket
         try:
             log('Incoming request from %s:%s' % self.client_address)
             request = self.request.recv(1024).strip()
             log('Incoming request: ' + request)
             
             # send sensorData
-            #self.request.sendall(BigJsonPacket)
+            #self.request.sendall(str(BigJsonPacket))
+            self.request.sendall(json.dumps(BigJsonPacket))
+            BigJsonPacket = []
             log('Response sent to Ethernet')
         except Exception, e:
-            log("Exception while receiving message: " + str(e))
+                log("Exception while receiving message: " + str(e))
 
 
 def print_usage():
@@ -119,6 +127,7 @@ def main(arguments):
     log('Start server at %s:%s' % (ip, port))
 
     thread = Thread(target = listenSerialAndAccumulateData, args = ("COM5", 9600))
+    thread.daemon = True
     thread.start()
     server = MyTCPServer((ip, int(port)), MyTCPServerHandler)
     server.serve_forever()
@@ -126,6 +135,6 @@ def main(arguments):
 
 
 if __name__ == '__main__':
-    sys.stdout = open('/var/log/weather_monitor/carrier_proxy_serial.log', 'a')
-    sys.stderr = sys.stdout
+    #sys.stdout = open('/var/log/weather_monitor/carrier_proxy_serial.log', 'a')
+    #sys.stderr = sys.stdout
     main(sys.argv)
