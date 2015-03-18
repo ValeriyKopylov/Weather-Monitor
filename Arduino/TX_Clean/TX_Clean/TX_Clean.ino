@@ -32,10 +32,12 @@ uint8_t SensorDataBuffer[PacketSize];
 
 DHT dht(DHTPIN, DHTTYPE);
 
-MovingAvg tempAvg(5);
-MovingAvg gasAvg(5);
-MovingAvg lightAvg(5);
-MovingAvg humAvg(5);
+static const int MovingAvgLen = 5;
+
+MovingAvg tempAvg(MovingAvgLen);
+MovingAvg gasAvg(MovingAvgLen);
+MovingAvg lightAvg(MovingAvgLen);
+MovingAvg humAvg(MovingAvgLen);
 
 void setup() {
   Serial.begin(9600);
@@ -48,6 +50,29 @@ void setup() {
   dht.begin();
   // zero sensor data
   memset(SensorDataBuffer, 0, sizeof(SensorDataBuffer) * sizeof(byte));
+  
+  // fill moving avg buffers
+  for (int i = 0 ; i < MovingAvgLen ; ++i)
+  {
+    float tempC = 0;
+    float gasConc = 0;
+    float light = 0;
+    float humidity = 0;
+
+    for(int i = 1; i < interval + 1; ++i) {
+      unsigned long forLoopStart = millis();
+      tempC += readTemper(ds, addr);
+      gasConc += readGas((tempC / i), A0);
+      light += readLumin(A1);
+      humidity += dht.readHumidity();
+      delay(100);
+    }
+  
+    float midTemp = tempAvg.apply(tempC / interval);
+    float midGas = gasAvg.apply(gasConc / interval);
+    float midLight = lightAvg.apply(light / interval);
+    float midHum = humAvg.apply(humidity / interval);
+  }
 }
 
 void loop() {
