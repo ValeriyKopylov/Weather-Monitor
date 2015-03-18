@@ -31,6 +31,8 @@ uint8_t SensorDataBuffer[PacketSize];
 
 DHT dht(DHTPIN, DHTTYPE);
 
+float movingAverage(float val);
+
 void setup() {
   Serial.begin(9600);
   radio.begin();
@@ -64,10 +66,11 @@ void loop() {
     delay(1000 - (millis() - forLoopStart));
   }
 
-  float midTemp = tempC / interval;
-  float midGas = gasConc / interval;
-  float midLight = light / interval;
-  float midHum = humidity / interval;
+  float midTemp = movingAverage(tempC / interval);
+  float midGas = movingAverage(gasConc / interval);
+  float midLight = movingAverage(light / interval);
+  float midHum = movingAverage(humidity / interval);
+  
 // TODO: uncomment for demo
   Serial.println(midTemp);
   Serial.println(midGas);
@@ -96,4 +99,27 @@ void writeFloat(const float val, uint8_t* result) {
   uint8_t* valBufferF = (uint8_t*) &valFPart;
   memcpy(result, valBufferI, sizeof(valBufferI) * sizeof(uint8_t));
   memcpy(result + 2, valBufferF, sizeof(valBufferF) * sizeof(uint8_t));
+}
+
+float movingAverage(float val) {
+  static const int M = 5;
+  static float z[M];
+  static int ix = -1;
+  
+  int n;
+  float avg = 0;
+  if (ix == -1) {
+    for (n = 0 ; n < M ; ++n) {
+      z[n] = 0;
+    }
+    ix = 0;
+  }
+  
+  z[ix] = x;
+  ix = (ix + 1) % M;
+  for (n = 0 ; n < M ; ++n) {
+    avg += z[n];
+  }
+  
+  return avg / M;
 }
