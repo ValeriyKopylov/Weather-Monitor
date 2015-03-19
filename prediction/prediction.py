@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from spectrum import *
 import numpy as np
 from scipy import signal
+from dateutil.parser import *
 
 
 def print_usage():
@@ -17,11 +18,11 @@ Application arguments:
     [-i|--ip] <DB ip address>
     [-n|--name] <DB schema name>
     [-s|--sensor_id] <sensor id in DB>
-    [-f|--date_from] <start date for graph>
-    [-t|--date_to] <end date for graph>
+    [-f|--date_from] <prediction start date>
+    [-t|--date_to] <prediction end date>
 
 Example:
-./prediction.py --user data-collector --password 1 --host_ip 127.0.0.1 --db_name weather_monitor --sensor_id 1 --date_from 2015-01-01 --date_to 2015-02-01
+./prediction.py --user data-collector --password 1 --host_ip 127.0.0.1 --db_name weather_monitor --sensor_id 1 --date_from "2015-03-01 00:00:00" --date_to "2015-03-01 06:00:00"
 """
 
 
@@ -45,13 +46,20 @@ def parse_command_line(arguments):
         if opt == '-h':
             print_usage()
             sys.exit()
-        elif opt in ('-u', '--user'):      user = arg
-        elif opt in ('-p', '--password'):  password = arg
-        elif opt in ('-i', '--host_ip'):   host_ip = arg
-        elif opt in ('-n', '--db_name'):   db_name = arg
-        elif opt in ('-s', '--sensor_id'): sensor_id = arg
-        elif opt in ('-f', '--date_from'): date_from = arg
-        elif opt in ('-t', '--date_to'):   date_to = arg
+        elif opt in ('-u', '--user'):
+            user = arg
+        elif opt in ('-p', '--password'):
+            password = arg
+        elif opt in ('-i', '--host_ip'):
+            host_ip = arg
+        elif opt in ('-n', '--db_name'):
+            db_name = arg
+        elif opt in ('-s', '--sensor_id'):
+            sensor_id = arg
+        elif opt in ('-f', '--date_from'):
+            date_from = parse(arg)
+        elif opt in ('-t', '--date_to'):
+            date_to = parse(arg)
 
     if user == '' or password == '' or host_ip == '' or db_name == '' or sensor_id == 0 or date_from == 0 or date_to == 0:
         print_usage()
@@ -106,13 +114,15 @@ def predict(x, P, Fs):
 
 
 def main(arguments):
-    user, password, host_ip, db_name, sensor_id, date_from, date_to = parse_command_line(arguments)
+    user, password, host_ip, db_name, sensor_id, predict_date_from, predict_date_to = parse_command_line(arguments)
 
     # Connect to DB
     db_connection = mysql.connector.connect(user=user, password=password, host=host_ip, database=db_name)
     cursor = db_connection.cursor()
 
     # Get measurements from DB
+    base_date_from = predict_date_from - 2 * (predict_date_to - predict_date_from)
+    base_date_to = predict_date_from
     cursor.execute("""
         SELECT result
         FROM measurement
@@ -121,7 +131,7 @@ def main(arguments):
             AND
             (change_time BETWEEN %s AND %s)
         ORDER BY change_time
-        """, (sensor_id, date_from, date_to))
+        """, (sensor_id, base_date_from, base_date_to))
 
     y = zip(*cursor.fetchall())[0]
 
