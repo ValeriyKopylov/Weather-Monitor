@@ -1,6 +1,7 @@
 import sys
 import getopt
 import mysql.connector
+import datetime
 
 import matplotlib.pyplot as plt
 from spectrum import *
@@ -22,7 +23,7 @@ Application arguments:
     [-t|--date_to] <prediction end date>
 
 Example:
-./prediction.py --user data-collector --password 1 --host_ip 127.0.0.1 --db_name weather_monitor --sensor_id 1 --date_from "2015-03-01 00:00:00" --date_to "2015-03-01 06:00:00"
+./prediction.py --user predictor --password 1 --host_ip 127.0.0.1 --db_name weather_monitor --sensor_id 1 --date_from "2015-03-01 00:00:00" --date_to "2015-03-01 06:00:00"
 """
 
 
@@ -135,26 +136,18 @@ def main(arguments):
 
     y = zip(*cursor.fetchall())[0]
 
-    plt.close('all')
-
-    # all plots will be there
-    fig1 = plt.figure()
-
-    # point where to start prediction
-    M = len(y)
-    samples_per_half_a_day = 5760 / 2
-    # number of samples in extrapolated time series
-    P = len(y) + samples_per_half_a_day
-
     # discretization period
     T = np.float128(15)
 
     # discretization frequency
     Fs = np.float128(1 / T)
 
+    # point where to start prediction
+    M = len(y)
+    prediction_length = (predict_date_to - predict_date_from).total_seconds() / T
 
-    # time axis of input + predicted samples
-    ti = T * np.linspace(0, M - 1, M)
+    # number of samples in extrapolated time series
+    P = M + prediction_length
 
     # input signal
     # secs_in_day = 86400
@@ -166,23 +159,51 @@ def main(arguments):
     # s = 10 * np.sin(2*np.pi*50*ti / M)
     # y = y + noise
 
-    # plot noised guy
-    plt.plot(ti, y)
-
     # do the job
     tp, yp = predict(y, P - M, Fs)
 
-    # create figure for results
-    fig2 = plt.figure()
+    cursor.execute("""
+        DELETE FROM prediction
+        WHERE
+            (sensor_id = %s)
+            AND
+            (change_time BETWEEN %s AND %s)
+        """, (sensor_id, predict_date_from, predict_date_to))
 
-    # plot results
-    plt.plot(ti, y, tp, yp)
+    prediction_points = []
+    curr_t = predict_date_from
+    for point in yp[M:]:
+        curr_t += datetime.timedelta(seconds=int(T))
+        prediction_points.append((sensor_id, curr_t, float(point)))
 
-    # draw current moment
-    plt.axvline(M * T, -10, 10, linewidth=4, color='r')
+    cursor.executemany("""
+        INSERT INTO prediction (sensor_id, change_time, result)
+        VALUES (%s, %s, %s)
+        """, prediction_points)
 
-    # show everything
-    plt.show()
+    if True:
+        # time axis of input + predicted samples
+        ti = T * np.linspace(0, M - 1, M)
+
+        plt.close('all')
+
+        # all plots will be there
+        fig1 = plt.figure()
+
+        # plot noised guy
+        plt.plot(ti, y)
+
+        # create figure for results
+        fig2 = plt.figure()
+
+        # plot results
+        plt.plot(ti, y, tp, yp)
+
+        # draw current moment
+        plt.axvline(M * T, -10, 10, linewidth=4, color='r')
+
+        # show everything
+        plt.show()
 
 
 if __name__ == '__main__':
