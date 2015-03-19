@@ -6,7 +6,9 @@ import datetime
 import matplotlib.pyplot as plt
 from spectrum import *
 import numpy as np
+import time
 from scipy import signal
+import scipy.cluster.vq as vq
 from dateutil.parser import *
 
 
@@ -81,19 +83,19 @@ def predict(x, P, Fs):
     # order of regression model
     N = P
 
-    # convolve with leaky integrator and apply median filter
-    M = 10
-    lbd = float(M-1) / float(M)
-    h = (1 - lbd) * pow(lbd, np.arange(100))
-    x = np.convolve(x, h, 'valid')
-    x = signal.medfilt(x, 15)
+    # convolve with leaky integrator to reduce noise
+    #M = 10
+    #lbd = float(M-1) / float(M)
+    #h = (1 - lbd) * pow(lbd, np.arange(100))
+    #x = np.convolve(x, h, 'valid')
+
     # compute regression coefficients.
     while(True):
         global A
         gotException = False
         try:
             [A, E, K] = arburg(x, N)
-        except ValueError:
+        except (ValueError, IndexError):
             gotException = True
             N = N / 2
         if gotException == False:
@@ -110,7 +112,7 @@ def predict(x, P, Fs):
     # use lfilter func in future.
     for i in range(len(x), L):
         y[i] = -1 * np.sum(np.real(A) * y[i-1:i-1-N:-1])
-        
+
     return tp, y
 
 
@@ -134,6 +136,17 @@ def main(arguments):
         ORDER BY change_time
         """, (sensor_id, base_date_from, base_date_to))
 
+    fetched = cursor.fetchall()
+    
+    t = []
+    y = []
+
+    firstUnixTime = time.mktime(fetched[0][0].timetuple())
+    for curr_t, curr_y in fetched:
+        unixtime = time.mktime(curr_t.timetuple()) - firstUnixTime
+        t.append(unixtime)
+        y.append(curr_y)
+
     y = zip(*cursor.fetchall())[0]
 
     # discretization period
@@ -148,19 +161,30 @@ def main(arguments):
 
     # number of samples in extrapolated time series
     P = M + prediction_length
-
-    # input signal
-    # secs_in_day = 86400
+    ti = T * np.linspace(0, M - 1, M)
+    if len(t) != len(ti):
+        # looks like grid is irregular. Work this out via quantization
+        code, dist = vq.vq(ti, t)
+        y = y[code]
 
     # uncomment this while debugging
-    # sigma2 = 0.5 #power of the noise
-    # noise = sigma2 * np.random.rand(M)
-    # noise = 2 * np.random.rand(1, M)[0]
-    # s = 10 * np.sin(2*np.pi*50*ti / M)
-    # y = y + noise
+    # power of the noise
+    sigma2 = 0.05
+    noise = sigma2 * np.random.rand(M)
+    # apply noise
+    y += noise
+
+    # plot noised guy
+    plt.plot(ti, y)
+
+    # filter the guy first
+    y = signal.medfilt(y, 7)
 
     # do the job
     tp, yp = predict(y, P - M, Fs)
+
+    # filter the output
+    y = signal.medfilt(y, 7)
 
     cursor.execute("""
         DELETE FROM prediction
@@ -182,9 +206,6 @@ def main(arguments):
         """, prediction_points)
 
     if True:
-        # time axis of input + predicted samples
-        ti = T * np.linspace(0, M - 1, M)
-
         plt.close('all')
 
         # all plots will be there
