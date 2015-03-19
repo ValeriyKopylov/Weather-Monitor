@@ -99,7 +99,11 @@ def parse_command_line(arguments):
 
 
 def main(arguments):
-    log('Start ' + arguments[0])
+    start_message = 'Start'
+    for arg in arguments:
+        start_message += ' ' + str(arg)
+    log(start_message)
+
     ip, port = parse_command_line(arguments[1:])
     log('Start server at %s:%s' % (ip, port))
 

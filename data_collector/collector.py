@@ -86,7 +86,10 @@ def parse_outpost_data(outpost_data):
 
 
 def main(arguments):
-    log('Start ' + arguments[0])
+    start_message = 'Start'
+    for arg in arguments:
+        start_message += ' ' + str(arg)
+    log(start_message)
 
     user, password, host_ip, db_name, carrier_id = parse_command_line(arguments[1:])
 
