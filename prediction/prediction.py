@@ -7,10 +7,11 @@ from spectrum import *
 import numpy as np
 from scipy import signal
 
+
 def print_usage():
     print """\
 Application arguments:
-./display.py
+./prediction.py
     [-u|--user] <DB login>
     [-p|--p] <DB password>
     [-i|--ip] <DB ip address>
@@ -20,7 +21,7 @@ Application arguments:
     [-t|--date_to] <end date for graph>
 
 Example:
-./display.py --user data-collector --password 1 --host_ip 127.0.0.1 --db_name weather_monitor --sensor_id 1 --date_from 2015-01-01 --date_to 2015-02-01
+./prediction.py --user data-collector --password 1 --host_ip 127.0.0.1 --db_name weather_monitor --sensor_id 1 --date_from 2015-01-01 --date_to 2015-02-01
 """
 
 
@@ -107,16 +108,13 @@ def predict(x, P, Fs):
 def main(arguments):
     user, password, host_ip, db_name, sensor_id, date_from, date_to = parse_command_line(arguments)
 
-    t = []
-    y = []
-
     # Connect to DB
     db_connection = mysql.connector.connect(user=user, password=password, host=host_ip, database=db_name)
     cursor = db_connection.cursor()
 
     # Get measurements from DB
     cursor.execute("""
-        SELECT change_time, result
+        SELECT result
         FROM measurement
         WHERE
             (sensor_id = %s)
@@ -125,12 +123,7 @@ def main(arguments):
         ORDER BY change_time
         """, (sensor_id, date_from, date_to))
 
-    fetched = cursor.fetchall()
-
-    # Group fetched data
-    for curr_t, curr_y in fetched:
-        t.append(curr_t)
-        y.append(curr_y)
+    y = zip(*cursor.fetchall())[0]
 
     plt.close('all')
 
@@ -143,11 +136,12 @@ def main(arguments):
     # number of samples in extrapolated time series
     P = len(y) + samples_per_half_a_day
 
-    # discretization frequency
-    Fs = np.float128(1 / 15.0)
-
     # discretization period
-    T = np.float128(1 / Fs)
+    T = np.float128(15)
+
+    # discretization frequency
+    Fs = np.float128(1 / T)
+
 
     # time axis of input + predicted samples
     ti = T * np.linspace(0, M - 1, M)
@@ -156,14 +150,15 @@ def main(arguments):
     # secs_in_day = 86400
 
     # uncomment this while debugging
-    sigma2 = 0.5 #power of the noise
-    noise = sigma2 * np.random.rand(M)
-    #noise = 2 * np.random.rand(1, M)[0]
-    #s = 10 * np.sin(2*np.pi*50*ti / M)
-    y = y + noise
+    # sigma2 = 0.5 #power of the noise
+    # noise = sigma2 * np.random.rand(M)
+    # noise = 2 * np.random.rand(1, M)[0]
+    # s = 10 * np.sin(2*np.pi*50*ti / M)
+    # y = y + noise
 
     # plot noised guy
     plt.plot(ti, y)
+
     # do the job
     tp, yp = predict(y, P - M, Fs)
 
@@ -172,8 +167,10 @@ def main(arguments):
 
     # plot results
     plt.plot(ti, y, tp, yp)
+
     # draw current moment
     plt.axvline(M * T, -10, 10, linewidth=4, color='r')
+
     # show everything
     plt.show()
 
