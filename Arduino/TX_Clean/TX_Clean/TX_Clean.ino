@@ -19,7 +19,7 @@ byte addr[8];
 
 
 const uint64_t pipes[2] = { 0xe7e7e7e7e7LL, 0xc2c2c2c2c2LL };
-static const uint16_t OutpostId = 0x01;
+static const uint16_t OutpostId = 0x0A;
 static const uint16_t SensorNumber = 0x06;
 static const uint16_t PacketSize = 0x12;
 static const byte TempSensorId = 0x01;
