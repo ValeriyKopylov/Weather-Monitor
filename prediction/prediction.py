@@ -141,13 +141,11 @@ def main(arguments):
     t = []
     y = []
 
-    firstUnixTime = time.mktime(fetched[0][0].timetuple())
-    for curr_t, curr_y in fetched:
-        unixtime = time.mktime(curr_t.timetuple()) - firstUnixTime
-        t.append(unixtime)
-        y.append(curr_y)
-
-    y = zip(*cursor.fetchall())[0]
+    localTime = 0
+    for curr_y in fetched:
+        t.append(localTime)
+        y.append(curr_y[0])
+        localTime += 15
 
     # discretization period
     T = np.float128(15)
@@ -184,7 +182,7 @@ def main(arguments):
     tp, yp = predict(y, P - M, Fs)
 
     # filter the output
-    y = signal.medfilt(y, 7)
+    yp = signal.medfilt(yp, 7)
 
     cursor.execute("""
         DELETE FROM prediction
